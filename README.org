@@ -1,0 +1,123 @@
+#+TITLE: zeta_vault
+
+*zeta_vault* is the local-first secret and identity service for ZetaX.
+
+** Architecture
+
+#+begin_example
+zeta_agent / zeta_trader / third-party programs
+                  |
+ zeta_vault_ctl / stable C ABI client library
+                  |
+       zpp/wire over Unix socket
+                  |
+          zeta_vault_server
+                  |
+ Argon2id + XChaCha20-Poly1305 file vault
+#+end_example
+
+The stable SDK boundary is C. C++ users include
+~<zeta_vault/zeta_vault.hpp>~, a header-only RAII wrapper implemented entirely
+in terms of the C ABI. There is no separate C++ ABI library.
+
+** API and management client
+
+The v0.2 C API supports:
+
+- connect and ping;
+- put or replace an exportable secret;
+- get an exportable secret into a libsodium-managed buffer;
+- remove a secret;
+- list all secret identifiers in lexical order;
+- lock the server until it is restarted and interactively unlocked.
+
+Secret identifiers must match ~^[a-z][a-z0-9_]{0,62}$~. The installed
+~zeta_vault_ctl~ uses the same public C ABI through the header-only C++ wrapper:
+
+#+begin_src text
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] put <secret_id> <secret-path>
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] get <secret_id> <secret-path>
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] remove <secret_id>
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] list
+#+end_src
+
+~put~ reads raw bytes from a non-symlink regular file owned by the current UID
+with no group or other permissions. ~get~ atomically creates a new mode-0600
+file and refuses to replace an existing path. These input and output files
+contain the *plaintext secret*: keep them private and remove them as soon as
+the transfer is complete.
+
+** Security model
+
+- The server reads the master password interactively from ~/dev/tty~ with echo
+  disabled. Passwords are not accepted through command-line arguments or
+  environment variables.
+- The password derives the data-encryption key with libsodium Argon2id.
+- Vault contents are encrypted with XChaCha20-Poly1305 and written atomically to
+  a mode-0600 file.
+- The vault file has a process-level exclusive lock, preventing concurrent
+  servers from overwriting the same file.
+- The Unix socket and its parent directory are private. Linux clients and the
+  server verify each other's effective UID with ~SO_PEERCRED~.
+- There is no administrator password, role, or ACL layer. Processes running as
+  the same UID have the same vault authority.
+- In-memory secret values use libsodium secure allocation. Temporary plaintext
+  protocol and persistence buffers are explicitly erased.
+
+The current release protects secrets at rest and reduces accidental exposure
+through process arguments, environment variables, configuration files, and
+cross-user access. It does *not* isolate mutually untrusted processes running
+under the same UID. Per-application capabilities/ACLs, audit logging, rollback
+protection, key rotation, and non-exporting signing/provider operations remain
+future work. A client that calls ~get_secret~ necessarily receives plaintext in
+its own process memory.
+
+** Build
+
+Dependencies are supplied by ZetaX repositories:
+
+- ~zpp >= 0.12~;
+- libsodium from ~zeta_forge deps~;
+- GTest when tests are enabled.
+
+The preferred entry point mirrors other ZetaX C++ projects:
+
+#+begin_src sh
+./zbuild.py --BUILD_TYPE=Debug
+./zbuild.py --BUILD_TYPE=Debug --install
+#+end_src
+
+Direct CMake configuration is also supported when the installed ~zpp~ and
+~zeta_deps~ package directories are present in ~CMAKE_PREFIX_PATH~:
+
+#+begin_src sh
+cmake -S . -B build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_PREFIX_PATH="$ZETAX_ROOT/install" \
+  -DZETA_DEPS_CMAKE_DIR="$ZETAX_ROOT/install/lib/cmake/zeta_deps/Debug"
+cmake --build build
+ctest --test-dir build --output-on-failure
+#+end_src
+
+The exact install prefix depends on the local ~zeta_forge~ configuration.
+
+** Run
+
+#+begin_src sh
+./build/src/zeta_vault_server
+#+end_src
+
+The default vault path is ~$HOME/.local/share/zeta/vault.bin~. The default
+socket is ~$XDG_RUNTIME_DIR/zeta/vault.sock~, or
+~/tmp/zeta-vault-<uid>/vault.sock~ when ~XDG_RUNTIME_DIR~ is unavailable.
+
+** Storage scope and compatibility
+
+v0.3 uses the same storage-v1 encrypted single-file backend. Vaults written by
+v0.2 load directly only when every identifier follows the v0.3 identifier
+rule. Use a v0.2 client to migrate legacy or overlong identifiers before
+upgrading; startup rejects such a vault without printing the offending ID.
+The internal storage boundary is
+replaceable. An SQLite backend should be added only after SQLite is managed
+centrally by ~zeta_forge~; this repository must not establish an independent
+third-party dependency path.

@@ -67,3 +67,13 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+build/
+build-*/
+cmake-build-*/
+compile_commands.json
+*.swp
+*.swo
+.DS_Store
+__pycache__/
+*.pyc
+**/.vorg.db

@@ -1,0 +1,69 @@
+#+TITLE: zeta_vault Architecture
+
+* Ownership
+
+~zeta_vault~ owns ZetaX application-specific secret storage, local service
+policy, and SDK behavior. Reusable primitive codecs remain in ~zpp/wire~.
+Third-party packages remain owned by ~zeta_forge~.
+
+* Components
+
+- ~zeta_vault_server~: interactive local service.
+- ~zeta_vault_ctl~: installed management client using only the public C++
+  wrapper and stable C ABI.
+- ~zeta_vault_c~: stable C ABI Unix-socket client library.
+- ~zeta_vault_cpp~: header-only C++ RAII target over ~zeta_vault_c~.
+- ~zeta_vault_protocol~: internal vault message semantics using ~zpp/wire~.
+- ~zeta_vault_storage~: internal encrypted storage implementation.
+
+* Protocol v1
+
+Every frame is little-endian and begins with a 24-byte header:
+
+| Field        | Type   | Meaning                       |
+|--------------+--------+-------------------------------|
+| magic        | 4 byte | ASCII ~ZVLT~                  |
+| version      | u16    | protocol version              |
+| message type | u16    | request or response type      |
+| request id   | u64    | request-response correlation  |
+| payload size | u32    | bounded payload byte count    |
+| reserved     | u32    | must be zero                  |
+
+Payload strings and byte arrays use a little-endian u32 length followed by
+exact bytes. The protocol is internal to the C SDK and server; third-party
+languages should bind the C ABI rather than reproduce the wire format.
+
+Message types 11 and 12 are the list request and response. The request payload
+is empty. The response data is a u32 count followed by length-prefixed IDs,
+strictly sorted and unique. A response contains at most 10000 IDs. All IDs
+match ~^[a-z][a-z0-9_]{0,62}$~.
+
+* Storage v1
+
+The file header stores magic, format version, bounded Argon2id parameters,
+salt, XChaCha20 nonce, and ciphertext size. The authenticated ciphertext holds
+a deterministic identifier-sorted serialization of all entries. Each save
+uses a new random nonce and an atomic same-directory rename.
+
+The storage format remains v1 in v0.3.0. Loading validates every stored ID;
+vaults with legacy IDs that violate the v0.3.0 rule fail during startup without
+including the ID in the diagnostic. They must be migrated with v0.2 tooling.
+
+* Security boundary
+
+The initial boundary assumes the user's account and kernel are trusted. It
+defends primarily against plaintext files, shell history, environment leakage,
+accidental broad filesystem permissions, corrupted ciphertext, concurrent
+writers, and clients from a different UID. It does not defend against malware,
+debuggers, or an impersonating process already running under the same UID.
+Bidirectional ~SO_PEERCRED~ same-UID validation remains the only authorization
+boundary; there is no administrator password, role, or ACL.
+
+* Planned evolution
+
+1. Capability sessions and per-application namespace ACLs.
+2. Audit events that never contain secret values.
+3. Non-exporting signing and provider request operations.
+4. Secret rotation and version metadata.
+5. OS keyring or hardware-backed unlock options.
+6. SQLite only after centralized ~zeta_forge~ dependency ownership.

@@ -1,0 +1,64 @@
+#+TITLE: zeta_vault 架构
+
+* 所有权边界
+
+~zeta_vault~ 负责 ZetaX 应用层 secret 存储、本地服务策略与 SDK 行为；通用
+二进制 primitive codec 继续由 ~zpp/wire~ 提供；第三方包统一由
+~zeta_forge~ 管理。
+
+* 组件
+
+- ~zeta_vault_server~：交互式本地服务。
+- ~zeta_vault_ctl~：只通过公共 C++ wrapper 和稳定 C ABI 访问服务的已安装
+  管理客户端。
+- ~zeta_vault_c~：稳定 C ABI Unix Socket 客户端库。
+- ~zeta_vault_cpp~：仅封装 ~zeta_vault_c~ 的 header-only C++ RAII target。
+- ~zeta_vault_protocol~：使用 ~zpp/wire~ 的内部 vault 业务协议。
+- ~zeta_vault_storage~：内部加密存储实现。
+
+* Protocol v1
+
+每个 frame 使用 little-endian，并以 24 字节 header 开始：
+
+| 字段         | 类型   | 含义                 |
+|--------------+--------+----------------------|
+| magic        | 4 byte | ASCII ~ZVLT~         |
+| version      | u16    | 协议版本             |
+| message type | u16    | 请求或响应类型       |
+| request id   | u64    | 请求响应关联 ID      |
+| payload size | u32    | 有上限的 payload 长度|
+| reserved     | u32    | 必须为 0             |
+
+payload 中的字符串和字节数组使用 little-endian u32 长度前缀。该协议是 C SDK
+与服务端之间的内部实现；第三方语言应绑定 C ABI，而不是重复实现 wire format。
+
+message type 11 和 12 分别为 list request/response。request payload 为空；
+response data 为 u32 count，后接严格排序且不重复的长度前缀 ID，最多 10000
+项。所有 ID 都必须匹配 ~^[a-z][a-z0-9_]{0,62}$~。
+
+* Storage v1
+
+文件 header 保存 magic、格式版本、有安全上限的 Argon2id 参数、salt、
+XChaCha20 nonce 和密文长度。认证密文保存按 identifier 排序的确定性 entry
+序列。每次保存生成新随机 nonce，并通过同目录原子 rename 替换文件。
+
+v0.3.0 仍使用 storage v1。加载时验证所有已存 ID；包含不符合 v0.3.0 规则
+的旧 ID 时，服务在启动阶段失败，且诊断不包含具体 ID。此类 vault 必须使用
+v0.2 工具迁移。
+
+* 安全边界
+
+初始版本假设用户账户与内核可信，主要防护明文配置文件、shell history、环境
+变量误泄露、过宽文件权限、密文损坏、并发 writer 和不同 UID 客户端。它不
+防护已在同一 UID 下运行的恶意程序、debugger 或 socket 冒充程序。
+双向 ~SO_PEERCRED~ 同 UID 校验仍是唯一授权边界，不增加 admin 密码、角色或
+ACL。
+
+* 后续演进
+
+1. capability session 与按应用划分的 namespace ACL。
+2. 永不包含 secret 值的审计事件。
+3. 不导出私钥的签名和 provider request operation。
+4. secret rotation 与版本 metadata。
+5. OS keyring 或硬件支持的解锁方式。
+6. 仅在 ~zeta_forge~ 纳管 SQLite 后增加 SQLite backend。

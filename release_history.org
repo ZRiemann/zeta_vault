@@ -1,0 +1,28 @@
+#+TITLE: zeta_vault Release History
+
+* v0.3.0
+
+- Add and install ~zeta_vault_ctl~ with ~put~, ~get~, ~remove~, and sorted
+  ~list~ operations.
+- Add protocol-v1 list request/response messages and list operations to the C
+  ABI and header-only C++ wrapper; raise the C ABI version to 0.2.0.
+- Restrict secret identifiers to lowercase C-style identifiers matching
+  ~^[a-z][a-z0-9_]{0,62}$~ throughout clients, protocol, and storage.
+- Reject legacy vault files containing identifiers outside the v0.3.0 rule
+  without disclosing those identifiers in diagnostics.
+- Enforce private input files and atomic, no-overwrite mode-0600 output files
+  for CLI plaintext secret transfer.
+
+* v0.2.0
+
+- Add the Linux Unix-domain-socket server with bidirectional peer UID checks.
+- Add a versioned request-response protocol encoded with zpp/wire.
+- Add Argon2id and XChaCha20-Poly1305 encrypted single-file storage.
+- Add atomic persistence, mode-0600 files, secure memory, and process locking.
+- Add the stable C ABI client library and header-only C++ RAII wrapper.
+- Add the shared zeta_forge build launcher, tests, a C example, install
+  exports, and bilingual documentation.
+
+* v0.1.0
+
+- Bootstrap the empty repository on the online initialization branch.

@@ -1,0 +1,92 @@
+#+TITLE: zeta_vault
+
+*zeta_vault* 是 ZetaX 的本地优先秘密与身份服务。
+
+** 架构
+
+#+begin_example
+zeta_agent / zeta_trader / 第三方程序
+                  |
+ zeta_vault_ctl / 稳定 C ABI 客户端库
+                  |
+       Unix Socket + zpp/wire
+                  |
+          zeta_vault_server
+                  |
+ Argon2id + XChaCha20-Poly1305 加密文件
+#+end_example
+
+稳定 SDK 边界采用 C ABI。C++ 程序包含
+~<zeta_vault/zeta_vault.hpp>~ 即可使用 header-only RAII 封装；项目不提供
+独立 C++ ABI 动态库。
+
+** API 与管理客户端
+
+v0.2 C API 支持连接与 ping、写入或替换可导出 secret、读取 secret、删除
+secret、按字典序列出全部 secret ID，以及锁定服务。锁定后必须重新启动服务并
+交互输入 master password。
+
+secret ID 必须匹配 ~^[a-z][a-z0-9_]{0,62}$~。安装后的
+~zeta_vault_ctl~ 通过 header-only C++ 封装调用同一个公共 C ABI：
+
+#+begin_src text
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] put <secret_id> <secret-path>
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] get <secret_id> <secret-path>
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] remove <secret_id>
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] list
+#+end_src
+
+~put~ 按原始字节读取文件，仅接受当前 UID 拥有、组和其他用户无任何权限的
+非符号链接普通文件。~get~ 原子创建新的 0600 文件，并拒绝覆盖已有路径。
+这些输入和输出文件都包含 *明文 secret*，应保持私有并在传输完成后尽快删除。
+
+** 安全模型
+
+- 服务通过 ~/dev/tty~ 交互读取 master password，并关闭终端回显；不接受
+  命令行参数或环境变量传递密码。
+- 使用 libsodium Argon2id 从密码派生数据加密密钥。
+- 使用 XChaCha20-Poly1305 加密 vault 内容，并以 0600 权限原子写入文件。
+- vault 文件持有进程级排他锁，避免多个服务并发覆盖同一密文文件。
+- Unix Socket 与父目录保持私有；Linux 客户端和服务端通过 ~SO_PEERCRED~
+  双向检查有效 UID。
+- 不设置 admin 密码、角色或 ACL；同一 UID 下的进程具有相同 vault 权限。
+- 服务端 secret 使用 libsodium 安全内存；临时明文协议和持久化 buffer 会被
+  显式清零。
+
+当前版本主要防止静态存储泄露、参数/环境变量误泄露及跨用户访问。它尚不能
+隔离同一 UID 下互不信任的进程。按应用划分的 capability/ACL、审计、回滚
+保护、密钥轮换，以及私钥签名或模型代理等“不导出 secret”的 operation API
+属于后续工作。客户端调用 ~get_secret~ 后，明文必然进入客户端自身内存。
+
+** 构建
+
+依赖由 ZetaX 统一提供：~zpp >= 0.12~、~zeta_forge deps~ 中的
+libsodium，以及启用测试时使用的 GTest。
+
+推荐使用与其他 ZetaX C++ 项目一致的入口：
+
+#+begin_src sh
+./zbuild.py --BUILD_TYPE=Debug
+./zbuild.py --BUILD_TYPE=Debug --install
+#+end_src
+
+在 ~CMAKE_PREFIX_PATH~ 已包含安装后的 ~zpp~ 和 ~zeta_deps~ 时，也可以直接
+使用 CMake：
+
+#+begin_src sh
+cmake -S . -B build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_PREFIX_PATH="$ZETAX_ROOT/install" \
+  -DZETA_DEPS_CMAKE_DIR="$ZETAX_ROOT/install/lib/cmake/zeta_deps/Debug"
+cmake --build build
+ctest --test-dir build --output-on-failure
+#+end_src
+
+** 当前存储范围与兼容性
+
+v0.3 继续使用 storage v1 加密单文件 backend。只有全部 ID 都符合 v0.3
+规则的 v0.2 vault 才能直接加载；旧式或超长 ID 应在升级前用 v0.2 客户端
+迁移，否则服务启动时拒绝加载，且错误信息不会输出非法 ID。项目保留可替换的
+内部 storage 边界。只有当
+SQLite 被 ~zeta_forge~ 统一纳管后，才增加 SQLite backend；本仓库不建立
+独立的第三方依赖管理路径。

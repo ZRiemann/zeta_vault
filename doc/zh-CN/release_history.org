@@ -1,0 +1,27 @@
+#+TITLE: zeta_vault 发布历史
+
+* v0.3.0
+
+- 新增并安装 ~zeta_vault_ctl~，提供 ~put~、~get~、~remove~ 和排序后的
+  ~list~ 操作。
+- 在 protocol v1、C ABI 与 header-only C++ 封装中增加 secret 列表操作，
+  C ABI 版本升级到 0.2.0。
+- 在客户端、协议和存储中统一限制 secret ID 必须匹配
+  ~^[a-z][a-z0-9_]{0,62}$~。
+- 启动时拒绝含有不符合 v0.3.0 ID 规则的旧 vault，诊断信息不泄露具体 ID。
+- CLI 传输明文 secret 时严格校验私有输入文件，并原子创建、不覆盖已有的
+  0600 输出文件。
+
+* v0.2.0
+
+- 增加 Linux Unix Domain Socket 服务，并双向校验对端 UID。
+- 增加使用 zpp/wire 编码的版本化请求响应协议。
+- 增加 Argon2id 与 XChaCha20-Poly1305 加密的单文件存储。
+- 增加原子持久化、0600 文件权限、安全内存和进程排他锁。
+- 增加稳定 C ABI 客户端库与 header-only C++ RAII 封装。
+- 增加复用 zeta_forge 的构建入口、单元及集成测试、C 示例、安装导出与
+  中英文文档。
+
+* v0.1.0
+
+- 在在线初始化分支上建立空仓库基线。
