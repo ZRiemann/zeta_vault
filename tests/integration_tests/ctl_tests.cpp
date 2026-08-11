@@ -133,6 +133,11 @@ read_test_file(const std::filesystem::path &path) {
   return data;
 }
 
+[[nodiscard]] secret_input make_secret_input(std::string_view value) {
+  return secret_input{
+      std::as_bytes(std::span<const char>{value.data(), value.size()})};
+}
+
 int invoke(std::vector<std::string> arguments, std::string &output,
            std::string &error) {
   std::vector<char *> values;
@@ -144,6 +149,24 @@ int invoke(std::vector<std::string> arguments, std::string &output,
   std::ostringstream captured_error;
   const int result = run(static_cast<int>(values.size()), values.data(),
                          captured_output, captured_error);
+  output = captured_output.str();
+  error = captured_error.str();
+  return result;
+}
+
+int invoke_with_hidden_input(std::vector<std::string> arguments,
+                             const hidden_input_reader &read_hidden_input,
+                             std::string &output, std::string &error) {
+  std::vector<char *> values;
+  values.reserve(arguments.size());
+  for (auto &argument : arguments) {
+    values.push_back(argument.data());
+  }
+  std::ostringstream captured_output;
+  std::ostringstream captured_error;
+  const int result =
+      run_with_hidden_input(static_cast<int>(values.size()), values.data(),
+                            captured_output, captured_error, read_hidden_input);
   output = captured_output.str();
   error = captured_error.str();
   return result;
@@ -181,6 +204,10 @@ TEST(ctl, completes_binary_file_lifecycle_and_enforces_file_safety) {
 
   std::string output;
   std::string error;
+  EXPECT_EQ(invoke({"zeta_vault_ctl", "--help"}, output, error), 0);
+  EXPECT_NE(output.find("put-utf8 ID"), std::string::npos);
+  EXPECT_TRUE(error.empty());
+
   EXPECT_EQ(invoke({"zeta_vault_ctl", "--socket", endpoint, "put",
                     "binary_secret", input.string()},
                    output, error),
@@ -191,10 +218,78 @@ TEST(ctl, completes_binary_file_lifecycle_and_enforces_file_safety) {
                    output, error),
             0);
 
+  const std::string utf8_value{
+      "api key \xc2\xa9 \xe4\xb8\xad\xe6\x96\x87 \xf0\x9f\x94\x91"};
+  const auto utf8_bytes = std::as_bytes(
+      std::span<const char>{utf8_value.data(), utf8_value.size()});
+  const std::vector<std::byte> expected_utf8{utf8_bytes.begin(),
+                                             utf8_bytes.end()};
+  bool hidden_reader_called{false};
+  const hidden_input_reader valid_reader = [&](std::string_view prompt,
+                                               std::size_t maximum_size,
+                                               std::string_view value_name) {
+    hidden_reader_called = true;
+    EXPECT_EQ(prompt, "Secret value for utf8_secret (UTF-8, input hidden): ");
+    EXPECT_EQ(maximum_size, 1024U * 1024U);
+    EXPECT_EQ(value_name, "UTF-8 secret");
+    return make_secret_input(utf8_value);
+  };
+  EXPECT_EQ(invoke_with_hidden_input({"zeta_vault_ctl", "--socket", endpoint,
+                                      "put-utf8", "utf8_secret"},
+                                     valid_reader, output, error),
+            0);
+  EXPECT_TRUE(hidden_reader_called);
+  EXPECT_TRUE(error.empty());
+  EXPECT_EQ(output, "stored utf8_secret (" + std::to_string(utf8_value.size()) +
+                        " bytes)\n");
+
+  EXPECT_EQ(invoke({"zeta_vault_ctl", "--socket", endpoint, "put-utf8",
+                    "unexpected_argument", "not-a-secret"},
+                   output, error),
+            2);
+  EXPECT_NE(error.find("exactly one secret identifier"), std::string::npos);
+  EXPECT_EQ(error.find("not-a-secret"), std::string::npos);
+
+  const std::vector<std::string> invalid_utf8_values{
+      std::string{},
+      std::string{"\0", 1},
+      std::string{"line\nbreak"},
+      std::string{"line\rbreak"},
+      std::string{"\x80", 1},
+      std::string{"\xc0\xaf", 2},
+      std::string{"\xe2\x82", 2},
+      std::string{"\xed\xa0\x80", 3},
+      std::string{"\xf4\x90\x80\x80", 4},
+  };
+  for (const auto &invalid_value : invalid_utf8_values) {
+    const hidden_input_reader invalid_reader =
+        [&](std::string_view, std::size_t, std::string_view) {
+          return make_secret_input(invalid_value);
+        };
+    EXPECT_EQ(invoke_with_hidden_input({"zeta_vault_ctl", "--socket", endpoint,
+                                        "put-utf8", "invalid_utf8"},
+                                       invalid_reader, output, error),
+              1);
+    EXPECT_TRUE(output.empty());
+    EXPECT_TRUE(error.find("must not be empty") != std::string::npos ||
+                error.find("one valid line") != std::string::npos);
+  }
+
+  const std::string oversized_value(1024U * 1024U + 1U, 'x');
+  const hidden_input_reader oversized_reader =
+      [&](std::string_view, std::size_t, std::string_view) {
+        return make_secret_input(oversized_value);
+      };
+  EXPECT_EQ(invoke_with_hidden_input({"zeta_vault_ctl", "--socket", endpoint,
+                                      "put-utf8", "oversized_utf8"},
+                                     oversized_reader, output, error),
+            1);
+  EXPECT_NE(error.find("1 MiB limit"), std::string::npos);
+
   EXPECT_EQ(
       invoke({"zeta_vault_ctl", "--socket", endpoint, "list"}, output, error),
       0);
-  EXPECT_EQ(output, "alpha_secret\nbinary_secret\n");
+  EXPECT_EQ(output, "alpha_secret\nbinary_secret\nutf8_secret\n");
   EXPECT_TRUE(error.empty());
 
   EXPECT_EQ(invoke({"zeta_vault_ctl", "--socket", endpoint, "get",
@@ -203,6 +298,13 @@ TEST(ctl, completes_binary_file_lifecycle_and_enforces_file_safety) {
             0);
   EXPECT_EQ(read_test_file(output_path),
             std::vector<std::byte>(expected.begin(), expected.end()));
+
+  const auto utf8_output_path = directory.path() / "utf8-output.bin";
+  EXPECT_EQ(invoke({"zeta_vault_ctl", "--socket", endpoint, "get",
+                    "utf8_secret", utf8_output_path.string()},
+                   output, error),
+            0);
+  EXPECT_EQ(read_test_file(utf8_output_path), expected_utf8);
   struct stat output_metadata{};
   ASSERT_EQ(::stat(output_path.c_str(), &output_metadata), 0);
   EXPECT_EQ(output_metadata.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO),
@@ -243,6 +345,10 @@ TEST(ctl, completes_binary_file_lifecycle_and_enforces_file_safety) {
             1);
   EXPECT_EQ(
       invoke({"zeta_vault_ctl", "--socket", endpoint, "remove", "alpha_secret"},
+             output, error),
+      0);
+  EXPECT_EQ(
+      invoke({"zeta_vault_ctl", "--socket", endpoint, "remove", "utf8_secret"},
              output, error),
       0);
   EXPECT_EQ(

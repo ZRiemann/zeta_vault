@@ -9,8 +9,8 @@
 
 #include <sodium.h>
 
+#include "common/hidden_input.h"
 #include "common/io.h"
-#include "server/password_prompt.h"
 #include "server/server.h"
 #include "storage/vault_store.h"
 
@@ -24,30 +24,6 @@ void handle_signal(int) noexcept { stop_requested = 1; }
 struct command_line {
   std::string vault_path;
   std::string endpoint;
-};
-
-/** Erases a master-password string when leaving scope. */
-class password_guard {
-public:
-  /** Starts guarding a master-password string. */
-  explicit password_guard(std::string &password) noexcept
-      : password_(password) {}
-
-  /** Password guards are not copyable. */
-  password_guard(const password_guard &) = delete;
-
-  /** Password guards are not copy assignable. */
-  password_guard &operator=(const password_guard &) = delete;
-
-  /** Erases the guarded password. */
-  ~password_guard() noexcept {
-    if (!password_.empty()) {
-      sodium_memzero(password_.data(), password_.size());
-    }
-  }
-
-private:
-  std::string &password_;
 };
 
 void print_usage(std::string_view executable) {
@@ -93,21 +69,25 @@ int main(int argc, char **argv) {
 
     std::unique_ptr<z::vault::vault_store> store;
     {
-      auto password = z::vault::prompt_password(
+      auto password = z::vault::prompt_hidden_input(
           creating ? "Create vault master password: "
-                   : "Vault master password: ");
-      password_guard password_cleanup{password};
+                   : "Vault master password: ",
+          4096, "master password");
       if (creating) {
-        auto confirmation =
-            z::vault::prompt_password("Confirm vault master password: ");
-        password_guard confirmation_cleanup{confirmation};
-        if (password != confirmation) {
+        auto confirmation = z::vault::prompt_hidden_input(
+            "Confirm vault master password: ", 4096, "master password");
+        const bool matches =
+            password.size() == confirmation.size() &&
+            (password.empty() ||
+             sodium_memcmp(password.bytes().data(), confirmation.bytes().data(),
+                           password.size()) == 0);
+        if (!matches) {
           throw std::runtime_error(
               "master password confirmation does not match");
         }
       }
-      store =
-          std::make_unique<z::vault::vault_store>(options.vault_path, password);
+      store = std::make_unique<z::vault::vault_store>(options.vault_path,
+                                                      password.text());
     }
 
     if (std::signal(SIGINT, handle_signal) == SIG_ERR ||

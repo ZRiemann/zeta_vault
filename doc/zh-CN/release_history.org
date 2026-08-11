@@ -1,5 +1,15 @@
 #+TITLE: zeta_vault 发布历史
 
+* v1.0.0
+
+- 新增 ~zeta_vault_ctl put-utf8~，无需明文文件、进程参数或环境变量即可隐藏
+  输入单行 UTF-8 secret。
+- 拒绝空值、超限、含 NUL 或格式错误的 UTF-8 输入；有效的单行字节保持原样，
+  不进行 trim 或 normalization。
+- server master password 与 CLI UTF-8 secret 复用同一套可擦除的 ~/dev/tty~
+  隐藏输入实现。
+- C ABI、protocol v1 与 storage v1 格式保持不变。
+
 * v0.3.0
 
 - 新增并安装 ~zeta_vault_ctl~，提供 ~put~、~get~、~remove~ 和排序后的

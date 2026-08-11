@@ -42,9 +42,9 @@ response data 为 u32 count，后接严格排序且不重复的长度前缀 ID�
 XChaCha20 nonce 和密文长度。认证密文保存按 identifier 排序的确定性 entry
 序列。每次保存生成新随机 nonce，并通过同目录原子 rename 替换文件。
 
-v0.3.0 仍使用 storage v1。加载时验证所有已存 ID；包含不符合 v0.3.0 规则
-的旧 ID 时，服务在启动阶段失败，且诊断不包含具体 ID。此类 vault 必须使用
-v0.2 工具迁移。
+v1.0.0 仍使用 storage v1。加载时验证所有已存 ID；包含不符合 v0.3.0 引入
+规则的旧 ID 时，服务在启动阶段失败，且诊断不包含具体 ID。此类 vault 必须
+使用 v0.2 工具迁移。
 
 * 安全边界
 

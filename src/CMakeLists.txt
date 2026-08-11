@@ -10,13 +10,16 @@ target_link_libraries(zeta_vault_protocol PUBLIC zpp::zpp)
 zeta_vault_enable_warnings(zeta_vault_protocol)
 
 add_library(zeta_vault_common STATIC
+  common/hidden_input.cpp
   common/io.cpp)
 target_include_directories(zeta_vault_common
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(zeta_vault_common PUBLIC Threads::Threads)
+target_link_libraries(zeta_vault_common
+  PUBLIC Threads::Threads
+  PRIVATE ${ZETA_VAULT_SODIUM_TARGET})
 zeta_vault_enable_warnings(zeta_vault_common)
 
 add_library(zeta_vault_storage STATIC
@@ -82,8 +85,7 @@ target_link_libraries(zeta_vault_server_core
 zeta_vault_enable_warnings(zeta_vault_server_core)
 
 add_executable(zeta_vault_server
-  server/main.cpp
-  server/password_prompt.cpp)
+  server/main.cpp)
 target_compile_definitions(zeta_vault_server PRIVATE _GNU_SOURCE)
 target_include_directories(zeta_vault_server PRIVATE
   ${PROJECT_SOURCE_DIR}/include
@@ -103,6 +105,7 @@ target_link_libraries(zeta_vault_ctl_core
   PUBLIC
     zeta_vault::cpp
   PRIVATE
+    zeta_vault_common
     ${ZETA_VAULT_SODIUM_TARGET})
 zeta_vault_enable_warnings(zeta_vault_ctl_core)
 

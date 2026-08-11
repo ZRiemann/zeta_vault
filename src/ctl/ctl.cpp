@@ -34,7 +34,7 @@ namespace {
 constexpr std::size_t maximum_secret_size = 1024U * 1024U;
 
 /** Supported zeta_vault_ctl operations. */
-enum class operation { put, get, remove, list };
+enum class operation { put, put_utf8, get, remove, list };
 
 /** Fully parsed command-line request. */
 struct command_line {
@@ -125,12 +125,15 @@ void print_usage(std::string_view executable, std::ostream &output) {
          << "  " << executable
          << " [--socket PATH] [--timeout-ms MS] put ID SECRET_PATH\n"
          << "  " << executable
+         << " [--socket PATH] [--timeout-ms MS] put-utf8 ID\n"
+         << "  " << executable
          << " [--socket PATH] [--timeout-ms MS] get ID SECRET_PATH\n"
          << "  " << executable
          << " [--socket PATH] [--timeout-ms MS] remove ID\n"
          << "  " << executable << " [--socket PATH] [--timeout-ms MS] list\n\n"
          << "ID must match ^[a-z][a-z0-9_]{0,62}$.\n"
          << "put requires a current-user-owned private regular file.\n"
+         << "put-utf8 reads one hidden UTF-8 line from /dev/tty.\n"
          << "get creates a new mode-0600 file and never overwrites.\n";
 }
 
@@ -147,6 +150,9 @@ void print_usage(std::string_view executable, std::ostream &output) {
 [[nodiscard]] operation parse_operation(std::string_view value) {
   if (value == "put") {
     return operation::put;
+  }
+  if (value == "put-utf8") {
+    return operation::put_utf8;
   }
   if (value == "get") {
     return operation::get;
@@ -213,6 +219,12 @@ void print_usage(std::string_view executable, std::ostream &output) {
     }
     return result;
   }
+  if (result.command == operation::put_utf8) {
+    if (index != argc) {
+      throw usage_error("put-utf8 accepts exactly one secret identifier");
+    }
+    return result;
+  }
   if (index >= argc) {
     throw usage_error("command requires a secret file path");
   }
@@ -275,6 +287,76 @@ read_private_file(const std::filesystem::path &path) {
   }
   descriptor.close_checked();
   return data;
+}
+
+[[nodiscard]] bool is_utf8_continuation(std::uint8_t value) noexcept {
+  return value >= 0x80U && value <= 0xbfU;
+}
+
+[[nodiscard]] bool
+is_valid_single_line_utf8(std::span<const std::byte> value) noexcept {
+  std::size_t index{0};
+  while (index < value.size()) {
+    const auto first = std::to_integer<std::uint8_t>(value[index]);
+    if (first <= 0x7fU) {
+      if (first == 0U || first == 0x0aU || first == 0x0dU) {
+        return false;
+      }
+      ++index;
+      continue;
+    }
+
+    if (first >= 0xc2U && first <= 0xdfU) {
+      if (index + 1 >= value.size() ||
+          !is_utf8_continuation(
+              std::to_integer<std::uint8_t>(value[index + 1]))) {
+        return false;
+      }
+      index += 2;
+      continue;
+    }
+
+    if (first >= 0xe0U && first <= 0xefU) {
+      if (index + 2 >= value.size()) {
+        return false;
+      }
+      const auto second = std::to_integer<std::uint8_t>(value[index + 1]);
+      const auto third = std::to_integer<std::uint8_t>(value[index + 2]);
+      const bool ordinary_second = ((first >= 0xe1U && first <= 0xecU) ||
+                                    (first >= 0xeeU && first <= 0xefU)) &&
+                                   is_utf8_continuation(second);
+      const bool valid_second =
+          (first == 0xe0U && second >= 0xa0U && second <= 0xbfU) ||
+          (first == 0xedU && second >= 0x80U && second <= 0x9fU) ||
+          ordinary_second;
+      if (!valid_second || !is_utf8_continuation(third)) {
+        return false;
+      }
+      index += 3;
+      continue;
+    }
+
+    if (first >= 0xf0U && first <= 0xf4U) {
+      if (index + 3 >= value.size()) {
+        return false;
+      }
+      const auto second = std::to_integer<std::uint8_t>(value[index + 1]);
+      const auto third = std::to_integer<std::uint8_t>(value[index + 2]);
+      const auto fourth = std::to_integer<std::uint8_t>(value[index + 3]);
+      const bool valid_second =
+          (first == 0xf0U && second >= 0x90U && second <= 0xbfU) ||
+          (first >= 0xf1U && first <= 0xf3U && is_utf8_continuation(second)) ||
+          (first == 0xf4U && second >= 0x80U && second <= 0x8fU);
+      if (!valid_second || !is_utf8_continuation(third) ||
+          !is_utf8_continuation(fourth)) {
+        return false;
+      }
+      index += 4;
+      continue;
+    }
+    return false;
+  }
+  return true;
 }
 
 [[nodiscard]] std::string random_suffix() {
@@ -360,13 +442,33 @@ void write_new_file_atomically(const std::filesystem::path &path,
   return client{command.socket, command.timeout_ms};
 }
 
-int execute(const command_line &command, std::ostream &output) {
+int execute(const command_line &command, std::ostream &output,
+            const hidden_input_reader &read_hidden_input) {
   auto vault = make_client(command);
   switch (command.command) {
   case operation::put: {
     auto data = read_private_file(command.secret_path);
     buffer_wipe_guard guard{data};
     vault.put(command.secret_id, data);
+    output << "stored " << command.secret_id << " (" << data.size()
+           << " bytes)\n";
+    return 0;
+  }
+  case operation::put_utf8: {
+    std::string prompt{"Secret value for "};
+    prompt.append(command.secret_id).append(" (UTF-8, input hidden): ");
+    auto data = read_hidden_input(prompt, maximum_secret_size, "UTF-8 secret");
+    if (data.empty()) {
+      throw std::runtime_error("UTF-8 secret must not be empty");
+    }
+    if (data.size() > maximum_secret_size) {
+      throw std::runtime_error("UTF-8 secret exceeds the 1 MiB limit");
+    }
+    if (!is_valid_single_line_utf8(data.bytes())) {
+      throw std::runtime_error(
+          "UTF-8 secret must contain one valid line without NUL bytes");
+    }
+    vault.put(command.secret_id, data.bytes());
     output << "stored " << command.secret_id << " (" << data.size()
            << " bytes)\n";
     return 0;
@@ -393,12 +495,15 @@ int execute(const command_line &command, std::ostream &output) {
 
 } // namespace
 
-int run(int argc, char **argv, std::ostream &output, std::ostream &error) {
+int run_with_hidden_input(int argc, char **argv, std::ostream &output,
+                          std::ostream &error,
+                          const hidden_input_reader &read_hidden_input) {
   try {
     if (sodium_init() < 0) {
       throw std::runtime_error("libsodium initialization failed");
     }
-    return execute(parse_arguments(argc, argv, output), output);
+    return execute(parse_arguments(argc, argv, output), output,
+                   read_hidden_input);
   } catch (const usage_error &exception) {
     if (*exception.what() != '\0') {
       error << "zeta_vault_ctl: " << exception.what() << '\n';
@@ -410,6 +515,10 @@ int run(int argc, char **argv, std::ostream &output, std::ostream &error) {
     error << "zeta_vault_ctl: " << exception.what() << '\n';
     return 1;
   }
+}
+
+int run(int argc, char **argv, std::ostream &output, std::ostream &error) {
+  return run_with_hidden_input(argc, argv, output, error, prompt_hidden_input);
 }
 
 } // namespace z::vault::ctl

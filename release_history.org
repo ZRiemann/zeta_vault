@@ -1,5 +1,15 @@
 #+TITLE: zeta_vault Release History
 
+* v1.0.0
+
+- Add ~zeta_vault_ctl put-utf8~ for hidden single-line UTF-8 secret entry
+  without plaintext files, process arguments, or environment variables.
+- Reject empty, oversized, NUL-containing, and malformed UTF-8 input while
+  preserving valid single-line bytes without trimming or normalization.
+- Reuse one wipeable ~/dev/tty~ input implementation for the server master
+  password and CLI UTF-8 secrets.
+- Keep the C ABI, protocol v1, and storage v1 formats unchanged.
+
 * v0.3.0
 
 - Add and install ~zeta_vault_ctl~ with ~put~, ~get~, ~remove~, and sorted

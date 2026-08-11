@@ -36,6 +36,7 @@ Secret identifiers must match ~^[a-z][a-z0-9_]{0,62}$~. The installed
 
 #+begin_src text
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] put <secret_id> <secret-path>
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] put-utf8 <secret_id>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] get <secret_id> <secret-path>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] remove <secret_id>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] list
@@ -47,11 +48,19 @@ file and refuses to replace an existing path. These input and output files
 contain the *plaintext secret*: keep them private and remove them as soon as
 the transfer is complete.
 
+~put-utf8~ reads one non-empty UTF-8 line directly from ~/dev/tty~ with echo
+disabled. The terminating Enter is not stored; spaces and Unicode characters
+are preserved without trimming or normalization. The secret is never accepted
+through command-line arguments, standard input, or environment variables. Use
+the file-based ~put~ command for multiline or binary values.
+
 ** Security model
 
 - The server reads the master password interactively from ~/dev/tty~ with echo
   disabled. Passwords are not accepted through command-line arguments or
   environment variables.
+- The CLI reads ~put-utf8~ values from ~/dev/tty~ with echo disabled, keeping
+  them out of process arguments, shell history, and environment variables.
 - The password derives the data-encryption key with libsodium Argon2id.
 - Vault contents are encrypted with XChaCha20-Poly1305 and written atomically to
   a mode-0600 file.
