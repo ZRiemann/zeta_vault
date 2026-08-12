@@ -172,7 +172,12 @@ private:
     options.timeout_ms = timeout_ms;
     const auto status = zeta_vault_client_create(&options, &handle_);
     if (status != ZETA_VAULT_STATUS_OK) {
-      throw error(status, zeta_vault_status_name(status));
+      const char *detail = zeta_vault_client_last_error(nullptr);
+      std::string message = zeta_vault_status_name(status);
+      if (detail != nullptr && *detail != '\0') {
+        message.append(": ").append(detail);
+      }
+      throw error(status, std::move(message));
     }
   }
 

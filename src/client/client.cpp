@@ -35,6 +35,8 @@ using z::vault::protocol::message_type;
 constexpr std::size_t unix_path_capacity =
     sizeof(((sockaddr_un *)nullptr)->sun_path);
 
+thread_local std::string last_creation_error;
+
 /** Erases a temporary protocol buffer when leaving scope. */
 class wipe_guard {
 public:
@@ -60,6 +62,16 @@ zeta_vault_status_t set_error(zeta_vault_client_t *client,
     } catch (...) {
       client->last_error.clear();
     }
+  }
+  return status;
+}
+
+zeta_vault_status_t set_creation_error(zeta_vault_status_t status,
+                                       std::string_view message) noexcept {
+  try {
+    last_creation_error.assign(message);
+  } catch (...) {
+    last_creation_error.clear();
   }
   return status;
 }
@@ -197,22 +209,27 @@ extern "C" {
 zeta_vault_status_t
 zeta_vault_client_create(const zeta_vault_client_options_t *options,
                          zeta_vault_client_t **out_client) {
+  last_creation_error.clear();
   try {
     if (out_client == nullptr) {
-      return ZETA_VAULT_STATUS_INVALID_ARGUMENT;
+      return set_creation_error(ZETA_VAULT_STATUS_INVALID_ARGUMENT,
+                                "client output pointer must not be null");
     }
     *out_client = nullptr;
     if (options != nullptr &&
         options->struct_size < sizeof(zeta_vault_client_options_t)) {
-      return ZETA_VAULT_STATUS_INVALID_ARGUMENT;
+      return set_creation_error(ZETA_VAULT_STATUS_INVALID_ARGUMENT,
+                                "client options structure is too small");
     }
     if (sodium_init() < 0) {
-      return ZETA_VAULT_STATUS_CRYPTO_ERROR;
+      return set_creation_error(ZETA_VAULT_STATUS_CRYPTO_ERROR,
+                                "libsodium initialization failed");
     }
     auto client = std::unique_ptr<zeta_vault_client_t>{
         new (std::nothrow) zeta_vault_client_t{}};
     if (!client) {
-      return ZETA_VAULT_STATUS_INTERNAL_ERROR;
+      return set_creation_error(ZETA_VAULT_STATUS_INTERNAL_ERROR,
+                                "memory allocation failed");
     }
     const std::string endpoint =
         options != nullptr && options->endpoint != nullptr
@@ -221,12 +238,19 @@ zeta_vault_client_create(const zeta_vault_client_options_t *options,
     const auto status = connect_socket(
         endpoint, options != nullptr ? options->timeout_ms : 0, client.get());
     if (status != ZETA_VAULT_STATUS_OK) {
-      return status;
+      return set_creation_error(status, client->last_error);
     }
     *out_client = client.release();
     return ZETA_VAULT_STATUS_OK;
+  } catch (const std::bad_alloc &) {
+    return set_creation_error(ZETA_VAULT_STATUS_INTERNAL_ERROR,
+                              "memory allocation failed");
+  } catch (const std::exception &exception) {
+    return set_creation_error(ZETA_VAULT_STATUS_INTERNAL_ERROR,
+                              exception.what());
   } catch (...) {
-    return ZETA_VAULT_STATUS_INTERNAL_ERROR;
+    return set_creation_error(ZETA_VAULT_STATUS_INTERNAL_ERROR,
+                              "unexpected client creation error");
   }
 }
 
@@ -432,7 +456,8 @@ zeta_vault_status_t zeta_vault_client_lock(zeta_vault_client_t *client) {
 }
 
 const char *zeta_vault_client_last_error(const zeta_vault_client_t *client) {
-  return client == nullptr ? "invalid client" : client->last_error.c_str();
+  return client == nullptr ? last_creation_error.c_str()
+                           : client->last_error.c_str();
 }
 
 void zeta_vault_secret_free(zeta_vault_secret_t *secret) {

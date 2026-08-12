@@ -1,5 +1,13 @@
 #+TITLE: zeta_vault 发布历史
 
+* v1.1.1
+
+- 按线程保留 client 创建阶段的诊断，C 调用者在没有 client handle 时也能
+  检查连接失败原因。
+- C++ wrapper 和 CLI 错误现在包含 ~connect: No such file or directory~ 等
+  创建阶段详细信息。
+- 向后兼容的 C API 版本升级到 0.2.1，protocol v1 和 storage v1 保持不变。
+
 * v1.1.0
 
 - ~put-utf8~ 在连接 server 前完成隐藏输入和本地校验，用户输入时间不再受

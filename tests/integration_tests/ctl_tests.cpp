@@ -206,7 +206,7 @@ TEST(ctl, reads_and_validates_hidden_input_before_connecting) {
       1);
   EXPECT_EQ(hidden_reader_calls, 2U);
   EXPECT_TRUE(output.empty());
-  EXPECT_NE(error.find("I/O error"), std::string::npos);
+  EXPECT_NE(error.find("I/O error: connect:"), std::string::npos);
 }
 
 TEST(ctl, completes_binary_file_lifecycle_and_enforces_file_safety) {

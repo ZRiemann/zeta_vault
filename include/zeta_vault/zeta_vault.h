@@ -11,7 +11,7 @@ extern "C" {
 
 #define ZETA_VAULT_API_VERSION_MAJOR 0
 #define ZETA_VAULT_API_VERSION_MINOR 2
-#define ZETA_VAULT_API_VERSION_PATCH 0
+#define ZETA_VAULT_API_VERSION_PATCH 1
 
 /**
  * Opaque zeta_vault client handle.
@@ -112,8 +112,10 @@ zeta_vault_client_lock(zeta_vault_client_t *client);
 /**
  * Returns the most recent client-side diagnostic string.
  *
- * The returned pointer remains valid until the next operation on the same
- * handle or until the handle is destroyed.
+ * Pass NULL immediately after a failed zeta_vault_client_create call to read
+ * that thread's creation diagnostic. The returned pointer remains valid until
+ * the next creation attempt on the same thread. For a non-NULL handle, it
+ * remains valid until the next operation on that handle or until destruction.
  */
 ZETA_VAULT_API const char *
 zeta_vault_client_last_error(const zeta_vault_client_t *client);

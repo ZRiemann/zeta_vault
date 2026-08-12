@@ -22,9 +22,13 @@ zeta_agent / zeta_trader / 第三方程序
 
 ** API 与管理客户端
 
-v0.2 C API 支持连接与 ping、写入或替换可导出 secret、读取 secret、删除
+v0.2.1 C API 支持连接与 ping、写入或替换可导出 secret、读取 secret、删除
 secret、按字典序列出全部 secret ID，以及锁定服务。锁定后必须重新启动服务并
 交互输入 master password。
+
+client 创建失败后，在同一线程中立即传入 ~NULL~ 调用
+~zeta_vault_client_last_error~ 可获取详细诊断。C++ wrapper 会自动将该信息
+加入 exception。
 
 secret ID 必须匹配 ~^[a-z][a-z0-9_]{0,62}$~。安装后的
 ~zeta_vault_ctl~ 通过 header-only C++ 封装调用同一个公共 C ABI：
@@ -93,7 +97,7 @@ ctest --test-dir build --output-on-failure
 
 ** 当前存储范围与兼容性
 
-v1.1 继续使用 storage v1 加密单文件 backend。只有全部 ID 都符合 v0.3
+v1.1.1 继续使用 storage v1 加密单文件 backend。只有全部 ID 都符合 v0.3
 规则的 v0.2 vault 才能直接加载；旧式或超长 ID 应在升级前用 v0.2 客户端
 迁移，否则服务启动时拒绝加载，且错误信息不会输出非法 ID。项目保留可替换的
 内部 storage 边界。只有当

@@ -1,5 +1,14 @@
 #+TITLE: zeta_vault Release History
 
+* v1.1.1
+
+- Preserve client-creation diagnostics per thread so C callers can inspect
+  connection failures without a client handle.
+- Include detailed creation diagnostics such as ~connect: No such file or
+  directory~ in C++ wrapper and CLI errors.
+- Raise the backward-compatible C API version to 0.2.1 while keeping protocol
+  v1 and storage v1 unchanged.
+
 * v1.1.0
 
 - Read and validate ~put-utf8~ input before opening the server connection, so

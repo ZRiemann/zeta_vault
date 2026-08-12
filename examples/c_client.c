@@ -10,7 +10,8 @@ int main(int argc, char **argv) {
   const zeta_vault_status_t created =
       zeta_vault_client_create(&options, &client);
   if (created != ZETA_VAULT_STATUS_OK) {
-    fprintf(stderr, "connect failed: %s\n", zeta_vault_status_name(created));
+    fprintf(stderr, "connect failed: %s: %s\n", zeta_vault_status_name(created),
+            zeta_vault_client_last_error(NULL));
     return 1;
   }
 

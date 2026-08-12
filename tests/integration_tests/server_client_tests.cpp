@@ -9,6 +9,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <thread>
 
@@ -177,6 +178,23 @@ private:
   zeta_vault_secret_id_list_t value{};
 };
 
+TEST(server_client, reports_client_creation_diagnostics) {
+  temporary_directory directory;
+  const auto missing_endpoint = (directory.path() / "missing.sock").string();
+  zeta_vault_client_options_t options{};
+  options.struct_size = sizeof(options);
+  options.endpoint = missing_endpoint.c_str();
+
+  client_guard client;
+  EXPECT_EQ(zeta_vault_client_create(&options, client.out()),
+            ZETA_VAULT_STATUS_IO_ERROR);
+  EXPECT_EQ(client.get(), nullptr);
+  const char *diagnostic = zeta_vault_client_last_error(nullptr);
+  ASSERT_NE(diagnostic, nullptr);
+  EXPECT_NE(std::string_view{diagnostic}.find("connect:"),
+            std::string_view::npos);
+}
+
 TEST(server_client, completes_secret_lifecycle_and_lock) {
   temporary_directory directory;
   const auto vault_path = directory.path() / "vault.bin";
@@ -211,6 +229,7 @@ TEST(server_client, completes_secret_lifecycle_and_lock) {
   client_guard client;
   ASSERT_EQ(zeta_vault_client_create(&options, client.out()),
             ZETA_VAULT_STATUS_OK);
+  EXPECT_STREQ(zeta_vault_client_last_error(nullptr), "");
 
   secret_id_list_guard identifiers;
   ASSERT_EQ(zeta_vault_client_list_secrets(client.get(), identifiers.out()),

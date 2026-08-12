@@ -22,7 +22,7 @@ in terms of the C ABI. There is no separate C++ ABI library.
 
 ** API and management client
 
-The v0.2 C API supports:
+The v0.2.1 C API supports:
 
 - connect and ping;
 - put or replace an exportable secret;
@@ -30,6 +30,11 @@ The v0.2 C API supports:
 - remove a secret;
 - list all secret identifiers in lexical order;
 - lock the server until it is restarted and interactively unlocked.
+
+When client creation fails, pass ~NULL~ to
+~zeta_vault_client_last_error~ immediately on the same thread to retrieve the
+detailed creation diagnostic. The C++ wrapper includes this detail in its
+exception automatically.
 
 Secret identifiers must match ~^[a-z][a-z0-9_]{0,62}$~. The installed
 ~zeta_vault_ctl~ uses the same public C ABI through the header-only C++ wrapper:
@@ -124,7 +129,7 @@ socket is ~$XDG_RUNTIME_DIR/zeta/vault.sock~, or
 
 ** Storage scope and compatibility
 
-v1.1 uses the same storage-v1 encrypted single-file backend. Vaults written by
+v1.1.1 uses the same storage-v1 encrypted single-file backend. Vaults written by
 v0.2 load directly only when every identifier follows the v0.3 identifier
 rule. Use a v0.2 client to migrate legacy or overlong identifiers before
 upgrading; startup rejects such a vault without printing the offending ID.

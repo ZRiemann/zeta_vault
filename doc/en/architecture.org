@@ -45,7 +45,7 @@ salt, XChaCha20 nonce, and ciphertext size. The authenticated ciphertext holds
 a deterministic identifier-sorted serialization of all entries. Each save
 uses a new random nonce and an atomic same-directory rename.
 
-The storage format remains v1 in v1.1.0. Loading validates every stored ID;
+The storage format remains v1 in v1.1.1. Loading validates every stored ID;
 vaults with legacy IDs that violate the rule introduced in v0.3.0 fail during
 startup without including the ID in the diagnostic. They must be migrated with
 v0.2 tooling.
