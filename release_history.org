@@ -1,5 +1,13 @@
 #+TITLE: zeta_vault Release History
 
+* v1.1.0
+
+- Read and validate ~put-utf8~ input before opening the server connection, so
+  interactive typing time is not constrained by socket timeouts.
+- Add regression coverage that proves hidden input completes before a failed
+  connection attempt.
+- Keep the C ABI, protocol v1, and storage v1 formats unchanged.
+
 * v1.0.0
 
 - Add ~zeta_vault_ctl put-utf8~ for hidden single-line UTF-8 secret entry

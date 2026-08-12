@@ -444,9 +444,9 @@ void write_new_file_atomically(const std::filesystem::path &path,
 
 int execute(const command_line &command, std::ostream &output,
             const hidden_input_reader &read_hidden_input) {
-  auto vault = make_client(command);
   switch (command.command) {
   case operation::put: {
+    auto vault = make_client(command);
     auto data = read_private_file(command.secret_path);
     buffer_wipe_guard guard{data};
     vault.put(command.secret_id, data);
@@ -468,27 +468,33 @@ int execute(const command_line &command, std::ostream &output,
       throw std::runtime_error(
           "UTF-8 secret must contain one valid line without NUL bytes");
     }
+    auto vault = make_client(command);
     vault.put(command.secret_id, data.bytes());
     output << "stored " << command.secret_id << " (" << data.size()
            << " bytes)\n";
     return 0;
   }
   case operation::get: {
+    auto vault = make_client(command);
     auto secret = vault.get(command.secret_id);
     write_new_file_atomically(command.secret_path, secret.bytes());
     output << "wrote " << secret.size() << " bytes to "
            << command.secret_path.string() << '\n';
     return 0;
   }
-  case operation::remove:
+  case operation::remove: {
+    auto vault = make_client(command);
     vault.remove(command.secret_id);
     output << "removed " << command.secret_id << '\n';
     return 0;
-  case operation::list:
+  }
+  case operation::list: {
+    auto vault = make_client(command);
     for (const auto &identifier : vault.list()) {
       output << identifier << '\n';
     }
     return 0;
+  }
   }
   throw std::logic_error("unsupported zeta_vault_ctl operation");
 }

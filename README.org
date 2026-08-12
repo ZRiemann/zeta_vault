@@ -52,7 +52,9 @@ the transfer is complete.
 disabled. The terminating Enter is not stored; spaces and Unicode characters
 are preserved without trimming or normalization. The secret is never accepted
 through command-line arguments, standard input, or environment variables. Use
-the file-based ~put~ command for multiline or binary values.
+the file-based ~put~ command for multiline or binary values. The CLI validates
+the hidden input before connecting, so ~--timeout-ms~ applies only to socket
+communication and does not limit the time available for typing.
 
 ** Security model
 
@@ -122,7 +124,7 @@ socket is ~$XDG_RUNTIME_DIR/zeta/vault.sock~, or
 
 ** Storage scope and compatibility
 
-v0.3 uses the same storage-v1 encrypted single-file backend. Vaults written by
+v1.1 uses the same storage-v1 encrypted single-file backend. Vaults written by
 v0.2 load directly only when every identifier follows the v0.3 identifier
 rule. Use a v0.2 client to migrate legacy or overlong identifiers before
 upgrading; startup rejects such a vault without printing the offending ID.

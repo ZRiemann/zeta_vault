@@ -44,7 +44,8 @@ zeta_vault_ctl [--socket PATH] [--timeout-ms MS] list
 ~put-utf8~ 直接从 ~/dev/tty~ 关闭回显后读取一行非空 UTF-8 文本。结束输入的
 Enter 不会存入 vault；空格和 Unicode 字符保持原样，不进行 trim 或
 normalization。secret 不通过命令行参数、标准输入或环境变量传递。多行或二进制
-内容继续使用文件型 ~put~。
+内容继续使用文件型 ~put~。CLI 会先校验隐藏输入再连接 server，因此
+~--timeout-ms~ 只限制 socket 通信，不限制用户输入时间。
 
 ** 安全模型
 
@@ -92,7 +93,7 @@ ctest --test-dir build --output-on-failure
 
 ** 当前存储范围与兼容性
 
-v0.3 继续使用 storage v1 加密单文件 backend。只有全部 ID 都符合 v0.3
+v1.1 继续使用 storage v1 加密单文件 backend。只有全部 ID 都符合 v0.3
 规则的 v0.2 vault 才能直接加载；旧式或超长 ID 应在升级前用 v0.2 客户端
 迁移，否则服务启动时拒绝加载，且错误信息不会输出非法 ID。项目保留可替换的
 内部 storage 边界。只有当

@@ -172,6 +172,43 @@ int invoke_with_hidden_input(std::vector<std::string> arguments,
   return result;
 }
 
+TEST(ctl, reads_and_validates_hidden_input_before_connecting) {
+  temporary_directory directory;
+  const auto missing_endpoint = (directory.path() / "missing.sock").string();
+  std::size_t hidden_reader_calls{0};
+  const hidden_input_reader invalid_reader = [&](std::string_view, std::size_t,
+                                                 std::string_view) {
+    ++hidden_reader_calls;
+    return make_secret_input("");
+  };
+  const hidden_input_reader valid_reader = [&](std::string_view, std::size_t,
+                                               std::string_view) {
+    ++hidden_reader_calls;
+    return make_secret_input("delayed secret");
+  };
+
+  std::string output;
+  std::string error;
+  EXPECT_EQ(
+      invoke_with_hidden_input({"zeta_vault_ctl", "--socket", missing_endpoint,
+                                "put-utf8", "invalid_secret"},
+                               invalid_reader, output, error),
+      1);
+  EXPECT_EQ(hidden_reader_calls, 1U);
+  EXPECT_TRUE(output.empty());
+  EXPECT_NE(error.find("must not be empty"), std::string::npos);
+  EXPECT_EQ(error.find("connect:"), std::string::npos);
+
+  EXPECT_EQ(
+      invoke_with_hidden_input({"zeta_vault_ctl", "--socket", missing_endpoint,
+                                "put-utf8", "delayed_secret"},
+                               valid_reader, output, error),
+      1);
+  EXPECT_EQ(hidden_reader_calls, 2U);
+  EXPECT_TRUE(output.empty());
+  EXPECT_NE(error.find("I/O error"), std::string::npos);
+}
+
 TEST(ctl, completes_binary_file_lifecycle_and_enforces_file_safety) {
   temporary_directory directory;
   const auto vault_path = directory.path() / "vault.bin";

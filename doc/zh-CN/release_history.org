@@ -1,5 +1,12 @@
 #+TITLE: zeta_vault 发布历史
 
+* v1.1.0
+
+- ~put-utf8~ 在连接 server 前完成隐藏输入和本地校验，用户输入时间不再受
+  socket 超时限制。
+- 增加回归测试，确认隐藏输入先于失败的连接尝试完成。
+- C ABI、protocol v1 与 storage v1 格式保持不变。
+
 * v1.0.0
 
 - 新增 ~zeta_vault_ctl put-utf8~，无需明文文件、进程参数或环境变量即可隐藏
