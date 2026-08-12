@@ -37,6 +37,7 @@ secret ID 必须匹配 ~^[a-z][a-z0-9_]{0,62}$~。安装后的
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] put <secret_id> <secret-path>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] put-utf8 <secret_id>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] get <secret_id> <secret-path>
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] show-utf8 <secret_id>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] remove <secret_id>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] list
 #+end_src
@@ -51,12 +52,19 @@ normalization。secret 不通过命令行参数、标准输入或环境变量传
 内容继续使用文件型 ~put~。CLI 会先校验隐藏输入再连接 server，因此
 ~--timeout-ms~ 只限制 socket 通信，不限制用户输入时间。
 
+~show-utf8~ 将已存 secret 直接显示到终端，用于人工查看。它拒绝非终端
+stdout，也拒绝空值、二进制、多行、非法 UTF-8 以及终端控制字符，并在显示值后
+额外输出一个换行。该命令会有意把明文暴露给终端 scrollback 或终端捕获工具；
+自动化场景仍应优先使用文件型 ~get~。
+
 ** 安全模型
 
 - 服务通过 ~/dev/tty~ 交互读取 master password，并关闭终端回显；不接受
   命令行参数或环境变量传递密码。
 - CLI 的 ~put-utf8~ 同样从 ~/dev/tty~ 关闭回显后读取，避免 secret 进入进程
   参数、shell history 或环境变量。
+- CLI 的 ~show-utf8~ 只向终端显示并拒绝终端控制字符，但显示后的明文可能保留在
+  scrollback。
 - 使用 libsodium Argon2id 从密码派生数据加密密钥。
 - 使用 XChaCha20-Poly1305 加密 vault 内容，并以 0600 权限原子写入文件。
 - vault 文件持有进程级排他锁，避免多个服务并发覆盖同一密文文件。
@@ -97,7 +105,7 @@ ctest --test-dir build --output-on-failure
 
 ** 当前存储范围与兼容性
 
-v1.1.1 继续使用 storage v1 加密单文件 backend。只有全部 ID 都符合 v0.3
+v1.2.0 继续使用 storage v1 加密单文件 backend。只有全部 ID 都符合 v0.3
 规则的 v0.2 vault 才能直接加载；旧式或超长 ID 应在升级前用 v0.2 客户端
 迁移，否则服务启动时拒绝加载，且错误信息不会输出非法 ID。项目保留可替换的
 内部 storage 边界。只有当

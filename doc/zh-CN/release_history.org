@@ -1,5 +1,13 @@
 #+TITLE: zeta_vault 发布历史
 
+* v1.2.0
+
+- 新增 ~zeta_vault_ctl show-utf8~，用于显式地把已存单行 UTF-8 secret 仅显示到
+  终端。
+- ~show-utf8~ 在显示前拒绝非终端 stdout、空值、非 UTF-8、多行值和终端控制
+  字符。
+- C ABI、protocol v1 与 storage v1 格式保持不变。
+
 * v1.1.1
 
 - 按线程保留 client 创建阶段的诊断，C 调用者在没有 client handle 时也能

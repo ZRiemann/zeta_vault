@@ -13,6 +13,7 @@
 #include <string>
 #include <system_error>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <sys/stat.h>
@@ -156,7 +157,8 @@ int invoke(std::vector<std::string> arguments, std::string &output,
 
 int invoke_with_hidden_input(std::vector<std::string> arguments,
                              const hidden_input_reader &read_hidden_input,
-                             std::string &output, std::string &error) {
+                             std::string &output, std::string &error,
+                             bool output_is_terminal = false) {
   std::vector<char *> values;
   values.reserve(arguments.size());
   for (auto &argument : arguments) {
@@ -164,12 +166,23 @@ int invoke_with_hidden_input(std::vector<std::string> arguments,
   }
   std::ostringstream captured_output;
   std::ostringstream captured_error;
-  const int result =
-      run_with_hidden_input(static_cast<int>(values.size()), values.data(),
-                            captured_output, captured_error, read_hidden_input);
+  const int result = run_with_hidden_input(
+      static_cast<int>(values.size()), values.data(), captured_output,
+      captured_error, read_hidden_input, output_is_terminal);
   output = captured_output.str();
   error = captured_error.str();
   return result;
+}
+
+int invoke_with_terminal_output(std::vector<std::string> arguments,
+                                bool output_is_terminal, std::string &output,
+                                std::string &error) {
+  const hidden_input_reader unused_reader =
+      [](std::string_view, std::size_t, std::string_view) -> secret_input {
+    throw std::logic_error("hidden input should not be read");
+  };
+  return invoke_with_hidden_input(std::move(arguments), unused_reader, output,
+                                  error, output_is_terminal);
 }
 
 TEST(ctl, reads_and_validates_hidden_input_before_connecting) {
@@ -207,6 +220,15 @@ TEST(ctl, reads_and_validates_hidden_input_before_connecting) {
   EXPECT_EQ(hidden_reader_calls, 2U);
   EXPECT_TRUE(output.empty());
   EXPECT_NE(error.find("I/O error: connect:"), std::string::npos);
+
+  EXPECT_EQ(invoke_with_terminal_output({"zeta_vault_ctl", "--socket",
+                                         missing_endpoint, "show-utf8",
+                                         "delayed_secret"},
+                                        false, output, error),
+            1);
+  EXPECT_TRUE(output.empty());
+  EXPECT_NE(error.find("stdout to be a terminal"), std::string::npos);
+  EXPECT_EQ(error.find("connect:"), std::string::npos);
 }
 
 TEST(ctl, completes_binary_file_lifecycle_and_enforces_file_safety) {
@@ -243,6 +265,7 @@ TEST(ctl, completes_binary_file_lifecycle_and_enforces_file_safety) {
   std::string error;
   EXPECT_EQ(invoke({"zeta_vault_ctl", "--help"}, output, error), 0);
   EXPECT_NE(output.find("put-utf8 ID"), std::string::npos);
+  EXPECT_NE(output.find("show-utf8 ID"), std::string::npos);
   EXPECT_TRUE(error.empty());
 
   EXPECT_EQ(invoke({"zeta_vault_ctl", "--socket", endpoint, "put",
@@ -346,6 +369,27 @@ TEST(ctl, completes_binary_file_lifecycle_and_enforces_file_safety) {
   ASSERT_EQ(::stat(output_path.c_str(), &output_metadata), 0);
   EXPECT_EQ(output_metadata.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO),
             S_IRUSR | S_IWUSR);
+
+  EXPECT_EQ(invoke_with_terminal_output({"zeta_vault_ctl", "--socket", endpoint,
+                                         "show-utf8", "utf8_secret"},
+                                        true, output, error),
+            0);
+  EXPECT_EQ(output, utf8_value + "\n");
+  EXPECT_TRUE(error.empty());
+
+  EXPECT_EQ(invoke_with_terminal_output({"zeta_vault_ctl", "--socket", endpoint,
+                                         "show-utf8", "utf8_secret"},
+                                        false, output, error),
+            1);
+  EXPECT_TRUE(output.empty());
+  EXPECT_NE(error.find("stdout to be a terminal"), std::string::npos);
+
+  EXPECT_EQ(invoke_with_terminal_output({"zeta_vault_ctl", "--socket", endpoint,
+                                         "show-utf8", "binary_secret"},
+                                        true, output, error),
+            1);
+  EXPECT_TRUE(output.empty());
+  EXPECT_NE(error.find("display-safe single-line UTF-8"), std::string::npos);
 
   EXPECT_EQ(invoke({"zeta_vault_ctl", "--socket", endpoint, "get",
                     "binary_secret", output_path.string()},

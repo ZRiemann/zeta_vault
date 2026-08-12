@@ -43,6 +43,7 @@ Secret identifiers must match ~^[a-z][a-z0-9_]{0,62}$~. The installed
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] put <secret_id> <secret-path>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] put-utf8 <secret_id>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] get <secret_id> <secret-path>
+zeta_vault_ctl [--socket PATH] [--timeout-ms MS] show-utf8 <secret_id>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] remove <secret_id>
 zeta_vault_ctl [--socket PATH] [--timeout-ms MS] list
 #+end_src
@@ -61,6 +62,13 @@ the file-based ~put~ command for multiline or binary values. The CLI validates
 the hidden input before connecting, so ~--timeout-ms~ applies only to socket
 communication and does not limit the time available for typing.
 
+~show-utf8~ reveals a stored secret directly on the terminal for manual
+inspection. It refuses non-terminal standard output, rejects empty, binary,
+multi-line, invalid UTF-8, and terminal-control values, and appends one newline
+after the displayed value. This command intentionally exposes plaintext to the
+terminal scrollback and any terminal capture tool; keep the file-based ~get~
+command as the safer default for automation.
+
 ** Security model
 
 - The server reads the master password interactively from ~/dev/tty~ with echo
@@ -68,6 +76,8 @@ communication and does not limit the time available for typing.
   environment variables.
 - The CLI reads ~put-utf8~ values from ~/dev/tty~ with echo disabled, keeping
   them out of process arguments, shell history, and environment variables.
+- The CLI shows ~show-utf8~ values only on a terminal and rejects terminal
+  control characters, but the revealed plaintext can remain in scrollback.
 - The password derives the data-encryption key with libsodium Argon2id.
 - Vault contents are encrypted with XChaCha20-Poly1305 and written atomically to
   a mode-0600 file.
@@ -129,7 +139,7 @@ socket is ~$XDG_RUNTIME_DIR/zeta/vault.sock~, or
 
 ** Storage scope and compatibility
 
-v1.1.1 uses the same storage-v1 encrypted single-file backend. Vaults written by
+v1.2.0 uses the same storage-v1 encrypted single-file backend. Vaults written by
 v0.2 load directly only when every identifier follows the v0.3 identifier
 rule. Use a v0.2 client to migrate legacy or overlong identifiers before
 upgrading; startup rejects such a vault without printing the offending ID.

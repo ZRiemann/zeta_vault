@@ -16,9 +16,10 @@ using hidden_input_reader = std::function<secret_input(
 /** Runs the zeta_vault_ctl command with injectable output streams. */
 int run(int argc, char **argv, std::ostream &output, std::ostream &error);
 
-/** Runs the CLI with an injectable hidden-input reader for testing. */
+/** Runs the CLI with injectable terminal state and hidden input for testing. */
 int run_with_hidden_input(int argc, char **argv, std::ostream &output,
                           std::ostream &error,
-                          const hidden_input_reader &read_hidden_input);
+                          const hidden_input_reader &read_hidden_input,
+                          bool output_is_terminal = false);
 
 } // namespace z::vault::ctl

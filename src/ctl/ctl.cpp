@@ -34,7 +34,7 @@ namespace {
 constexpr std::size_t maximum_secret_size = 1024U * 1024U;
 
 /** Supported zeta_vault_ctl operations. */
-enum class operation { put, put_utf8, get, remove, list };
+enum class operation { put, put_utf8, get, show_utf8, remove, list };
 
 /** Fully parsed command-line request. */
 struct command_line {
@@ -129,11 +129,14 @@ void print_usage(std::string_view executable, std::ostream &output) {
          << "  " << executable
          << " [--socket PATH] [--timeout-ms MS] get ID SECRET_PATH\n"
          << "  " << executable
+         << " [--socket PATH] [--timeout-ms MS] show-utf8 ID\n"
+         << "  " << executable
          << " [--socket PATH] [--timeout-ms MS] remove ID\n"
          << "  " << executable << " [--socket PATH] [--timeout-ms MS] list\n\n"
          << "ID must match ^[a-z][a-z0-9_]{0,62}$.\n"
          << "put requires a current-user-owned private regular file.\n"
          << "put-utf8 reads one hidden UTF-8 line from /dev/tty.\n"
+         << "show-utf8 writes one display-safe UTF-8 line only to a terminal.\n"
          << "get creates a new mode-0600 file and never overwrites.\n";
 }
 
@@ -156,6 +159,9 @@ void print_usage(std::string_view executable, std::ostream &output) {
   }
   if (value == "get") {
     return operation::get;
+  }
+  if (value == "show-utf8") {
+    return operation::show_utf8;
   }
   if (value == "remove") {
     return operation::remove;
@@ -213,9 +219,13 @@ void print_usage(std::string_view executable, std::ostream &output) {
   if (!is_valid_secret_id(result.secret_id)) {
     throw usage_error("secret identifier must match ^[a-z][a-z0-9_]{0,62}$");
   }
-  if (result.command == operation::remove) {
+  if (result.command == operation::remove ||
+      result.command == operation::show_utf8) {
     if (index != argc) {
-      throw usage_error("remove accepts exactly one secret identifier");
+      const auto name =
+          result.command == operation::remove ? "remove" : "show-utf8";
+      throw usage_error(std::string{name} +
+                        " accepts exactly one secret identifier");
     }
     return result;
   }
@@ -359,6 +369,55 @@ is_valid_single_line_utf8(std::span<const std::byte> value) noexcept {
   return true;
 }
 
+[[nodiscard]] bool is_terminal_safe_code_point(std::uint32_t value) noexcept {
+  return value > 0x1fU && (value < 0x7fU || value > 0x9fU);
+}
+
+[[nodiscard]] bool
+is_display_safe_single_line_utf8(std::span<const std::byte> value) noexcept {
+  if (!is_valid_single_line_utf8(value)) {
+    return false;
+  }
+
+  std::size_t index{0};
+  while (index < value.size()) {
+    const auto first = std::to_integer<std::uint8_t>(value[index]);
+    std::uint32_t code_point{0};
+    if (first <= 0x7fU) {
+      code_point = first;
+      ++index;
+    } else if (first <= 0xdfU) {
+      code_point = (static_cast<std::uint32_t>(first & 0x1fU) << 6U) |
+                   static_cast<std::uint32_t>(
+                       std::to_integer<std::uint8_t>(value[index + 1]) & 0x3fU);
+      index += 2;
+    } else if (first <= 0xefU) {
+      code_point = (static_cast<std::uint32_t>(first & 0x0fU) << 12U) |
+                   (static_cast<std::uint32_t>(
+                        std::to_integer<std::uint8_t>(value[index + 1]) & 0x3fU)
+                    << 6U) |
+                   static_cast<std::uint32_t>(
+                       std::to_integer<std::uint8_t>(value[index + 2]) & 0x3fU);
+      index += 3;
+    } else {
+      code_point = (static_cast<std::uint32_t>(first & 0x07U) << 18U) |
+                   (static_cast<std::uint32_t>(
+                        std::to_integer<std::uint8_t>(value[index + 1]) & 0x3fU)
+                    << 12U) |
+                   (static_cast<std::uint32_t>(
+                        std::to_integer<std::uint8_t>(value[index + 2]) & 0x3fU)
+                    << 6U) |
+                   static_cast<std::uint32_t>(
+                       std::to_integer<std::uint8_t>(value[index + 3]) & 0x3fU);
+      index += 4;
+    }
+    if (!is_terminal_safe_code_point(code_point)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 [[nodiscard]] std::string random_suffix() {
   std::array<unsigned char, 8> random{};
   randombytes_buf(random.data(), random.size());
@@ -443,7 +502,8 @@ void write_new_file_atomically(const std::filesystem::path &path,
 }
 
 int execute(const command_line &command, std::ostream &output,
-            const hidden_input_reader &read_hidden_input) {
+            const hidden_input_reader &read_hidden_input,
+            bool output_is_terminal) {
   switch (command.command) {
   case operation::put: {
     auto vault = make_client(command);
@@ -482,6 +542,22 @@ int execute(const command_line &command, std::ostream &output,
            << command.secret_path.string() << '\n';
     return 0;
   }
+  case operation::show_utf8: {
+    if (!output_is_terminal) {
+      throw std::runtime_error("show-utf8 requires stdout to be a terminal");
+    }
+    auto vault = make_client(command);
+    auto secret = vault.get(command.secret_id);
+    if (secret.empty() || !is_display_safe_single_line_utf8(secret.bytes())) {
+      throw std::runtime_error(
+          "secret is not a non-empty display-safe single-line UTF-8 value");
+    }
+    const auto bytes = secret.bytes();
+    output.write(reinterpret_cast<const char *>(bytes.data()),
+                 static_cast<std::streamsize>(bytes.size()));
+    output << '\n';
+    return 0;
+  }
   case operation::remove: {
     auto vault = make_client(command);
     vault.remove(command.secret_id);
@@ -503,13 +579,14 @@ int execute(const command_line &command, std::ostream &output,
 
 int run_with_hidden_input(int argc, char **argv, std::ostream &output,
                           std::ostream &error,
-                          const hidden_input_reader &read_hidden_input) {
+                          const hidden_input_reader &read_hidden_input,
+                          bool output_is_terminal) {
   try {
     if (sodium_init() < 0) {
       throw std::runtime_error("libsodium initialization failed");
     }
     return execute(parse_arguments(argc, argv, output), output,
-                   read_hidden_input);
+                   read_hidden_input, output_is_terminal);
   } catch (const usage_error &exception) {
     if (*exception.what() != '\0') {
       error << "zeta_vault_ctl: " << exception.what() << '\n';
@@ -524,7 +601,8 @@ int run_with_hidden_input(int argc, char **argv, std::ostream &output,
 }
 
 int run(int argc, char **argv, std::ostream &output, std::ostream &error) {
-  return run_with_hidden_input(argc, argv, output, error, prompt_hidden_input);
+  return run_with_hidden_input(argc, argv, output, error, prompt_hidden_input,
+                               ::isatty(STDOUT_FILENO) != 0);
 }
 
 } // namespace z::vault::ctl

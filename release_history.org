@@ -1,5 +1,13 @@
 #+TITLE: zeta_vault Release History
 
+* v1.2.0
+
+- Add ~zeta_vault_ctl show-utf8~ for explicit terminal-only display of stored
+  single-line UTF-8 secrets.
+- Reject non-terminal stdout, empty or non-UTF-8 values, multi-line values, and
+  terminal-control characters before revealing a secret through ~show-utf8~.
+- Keep the C ABI, protocol v1, and storage v1 formats unchanged.
+
 * v1.1.1
 
 - Preserve client-creation diagnostics per thread so C callers can inspect
