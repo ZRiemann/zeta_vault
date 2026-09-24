@@ -127,7 +127,7 @@ install(TARGETS zeta_vault_c
 install(TARGETS zeta_vault_server RUNTIME DESTINATION bin COMPONENT zeta_vault_server)
 install(TARGETS zeta_vault_ctl RUNTIME DESTINATION bin COMPONENT zeta_vault_ctl)
 install(TARGETS zeta_vault_cpp EXPORT zeta_vaultCppTargets
-  INCLUDES DESTINATION include COMPONENT zeta_vault_cpp)
+  COMPONENT zeta_vault_cpp)
 install(FILES ${PROJECT_SOURCE_DIR}/include/zeta_vault/export.h
   ${PROJECT_SOURCE_DIR}/include/zeta_vault/zeta_vault.h
   DESTINATION include/zeta_vault COMPONENT zeta_vault_c)

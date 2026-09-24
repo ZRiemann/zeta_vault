@@ -1,5 +1,12 @@
 #+TITLE: zeta_vault Release History
 
+* v1.3.1
+
+- Correct the exported C++ wrapper target's install interface by removing the
+  conflicting =INCLUDES DESTINATION= from its component install rule.
+- Document the published C ABI, C++ header, and =zeta_vault::cpp= target.
+- Builds and tests were not rerun for this commit.
+
 * v1.3.0
 
 - Migrate the repository to the unified Forge build entry with explicit

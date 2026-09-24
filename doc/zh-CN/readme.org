@@ -86,6 +86,9 @@ libsodium，以及启用测试时使用的 GTest。
 
 推荐使用与其他 ZetaX C++ 项目一致的入口：
 
+单独安装 =zeta_vault_cpp= 时会同时发布 C ABI、C++ header 和
+=zeta_vault::cpp= CMake target，其导出的头文件目录为安装前缀下的 =include=。
+
 #+begin_src sh
 ./zbuild.py build --profile debug
 ./zbuild.py install --profile debug

@@ -1,5 +1,12 @@
 #+TITLE: zeta_vault 发布历史
 
+* v1.3.1
+
+- 从 C++ wrapper target 的 component 安装规则移除冲突的 =INCLUDES DESTINATION=，
+  修复导出 target 的安装接口。
+- 记录发布的 C ABI、C++ header 和 =zeta_vault::cpp= target。
+- 本次提交未重新运行构建或测试。
+
 * v1.3.0
 
 - 迁移到统一 Forge 构建入口，支持显式交付目标、构建配置、测试和运行目标。
