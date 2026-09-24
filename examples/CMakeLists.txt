@@ -1,2 +1,5 @@
 add_executable(zeta_vault_c_example c_client.c)
+if(COMMAND add_run_target)
+  add_run_target(zeta_vault_c_example)
+endif()
 target_link_libraries(zeta_vault_c_example PRIVATE zeta_vault::c)

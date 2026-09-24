@@ -1,4 +1,5 @@
 @PACKAGE_INIT@
 
 include("${CMAKE_CURRENT_LIST_DIR}/zeta_vaultTargets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/zeta_vaultCppTargets.cmake" OPTIONAL)
 check_required_components(zeta_vault)

@@ -118,11 +118,23 @@ set_target_properties(zeta_vault_ctl PROPERTIES
   INSTALL_RPATH "$ORIGIN/../lib")
 zeta_vault_enable_warnings(zeta_vault_ctl)
 
-install(TARGETS zeta_vault_c zeta_vault_cpp
+install(TARGETS zeta_vault_c
   EXPORT zeta_vaultTargets
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
   INCLUDES DESTINATION include)
-install(TARGETS zeta_vault_server zeta_vault_ctl RUNTIME DESTINATION bin)
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/ DESTINATION include)
+install(TARGETS zeta_vault_server RUNTIME DESTINATION bin COMPONENT zeta_vault_server)
+install(TARGETS zeta_vault_ctl RUNTIME DESTINATION bin COMPONENT zeta_vault_ctl)
+install(TARGETS zeta_vault_cpp EXPORT zeta_vaultCppTargets
+  INCLUDES DESTINATION include COMPONENT zeta_vault_cpp)
+install(FILES ${PROJECT_SOURCE_DIR}/include/zeta_vault/export.h
+  ${PROJECT_SOURCE_DIR}/include/zeta_vault/zeta_vault.h
+  DESTINATION include/zeta_vault COMPONENT zeta_vault_c)
+install(FILES ${PROJECT_SOURCE_DIR}/include/zeta_vault/zeta_vault.hpp
+  DESTINATION include/zeta_vault COMPONENT zeta_vault_cpp)
+
+if(COMMAND add_run_target)
+  add_run_target(zeta_vault_server)
+  add_run_target(zeta_vault_ctl)
+endif()

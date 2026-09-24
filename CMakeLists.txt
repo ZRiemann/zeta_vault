@@ -19,6 +19,7 @@ set(ZETA_VAULT_PROJECT_VERSION
     "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
 
 project(zeta_vault VERSION ${ZETA_VAULT_PROJECT_VERSION} LANGUAGES C CXX)
+set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME zeta_vault_c)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -56,7 +57,7 @@ if(ZETA_DEPS_CMAKE_DIR)
 endif()
 
 find_package(Threads REQUIRED)
-find_package(zpp 0.12 CONFIG REQUIRED)
+find_package(zpp 1.0 CONFIG REQUIRED)
 
 find_package(sodium CONFIG QUIET)
 find_package(libsodium CONFIG QUIET)
@@ -110,3 +111,9 @@ install(EXPORT zeta_vaultTargets
   NAMESPACE zeta_vault::
   FILE zeta_vaultTargets.cmake
   DESTINATION lib/cmake/zeta_vault)
+
+install(EXPORT zeta_vaultCppTargets
+  NAMESPACE zeta_vault::
+  FILE zeta_vaultCppTargets.cmake
+  DESTINATION lib/cmake/zeta_vault
+  COMPONENT zeta_vault_cpp)

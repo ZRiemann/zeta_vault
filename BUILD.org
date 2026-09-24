@@ -1,0 +1,24 @@
+#+TITLE: zeta_vault build entry
+
+* Unified build entry
+The root entry uses =./zbuild.py <command> [deliverable ...] --profile release|debug=.
+The profile defaults to =release=. Run =./zbuild.py list= for targets and capabilities,
+and append =--dry-run= to inspect scope without executing. Unsupported actions fail.
+=check= performs non-mutating source/compiler checks; =test= prepares and runs native
+correctness suites. =run= requires an existing output; =dev= builds and runs (or
+uses the application's native watcher). Arguments after =--= are forwarded without
+logging. Cleanup affects the owning native engineering unit and selected profile;
+the plan names affected sibling outputs. Installations, data and shared caches stay intact.
+Host preparation and deployment are separate operations.
+
+Default: =zeta_vault_c zeta_vault_cpp zeta_vault_server zeta_vault_ctl=.
+The C example is explicit and there is no default runtime application.
+The C ABI and C++ wrapper have separate install components; installing the wrapper
+or ctl includes the required C ABI library. Server installation is independent. =dev= builds and runs once. Password input, socket, credentials
+and data ownership are unchanged; never pass passwords in command arguments.
+#+begin_src sh
+./zbuild.py build
+./zbuild.py test --profile debug
+./zbuild.py install zeta_vault_c
+./zbuild.py run zeta_vault_ctl -- --help
+#+end_src

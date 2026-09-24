@@ -1,5 +1,13 @@
 #+TITLE: zeta_vault Release History
 
+* v1.3.0
+
+- Migrate the repository to the unified Forge build entry with explicit
+  deliverables, profiles, test targets, and run targets.
+- Separate C ABI, C++ wrapper, server, and CLI install components; require
+  zpp 1.0 or newer.
+- Document default build scope and installation behavior in English and Chinese.
+
 * v1.2.0
 
 - Add ~zeta_vault_ctl show-utf8~ for explicit terminal-only display of stored

@@ -3,12 +3,12 @@
 Before modifying this repository, read and apply the repository-stored ZetaX
 rules from `ZRiemann/zsa`:
 
-- `agents/codex/AGENTS.md`
-- `agents/codex/skills/zetax-project/SKILL.md`
-- `agents/codex/skills/zetax-code-style/SKILL.md`
-- `agents/codex/skills/zetax-cpp-style/SKILL.md`
-- `agents/codex/skills/zetax-python-style/SKILL.md` when Python is touched
-- `agents/codex/skills/zetax-commit/SKILL.md` for commit work
+- `agents/zetax/AGENTS.md`
+- `agents/zetax/skills/zetax-project/SKILL.md`
+- `agents/zetax/skills/zetax-code-style/SKILL.md`
+- `agents/zetax/skills/zetax-cpp-style/SKILL.md`
+- `agents/zetax/skills/zetax-python-style/SKILL.md` when Python is touched
+- `agents/zetax/skills/zetax-commit/SKILL.md` for commit work
 
 Repository-specific rules:
 

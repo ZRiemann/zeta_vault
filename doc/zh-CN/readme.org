@@ -81,14 +81,14 @@ stdout，也拒绝空值、二进制、多行、非法 UTF-8 以及终端控制�
 
 ** 构建
 
-依赖由 ZetaX 统一提供：~zpp >= 0.12~、~zeta_forge deps~ 中的
+依赖由 ZetaX 统一提供：~zpp >= 1.0~、~zeta_forge deps~ 中的
 libsodium，以及启用测试时使用的 GTest。
 
 推荐使用与其他 ZetaX C++ 项目一致的入口：
 
 #+begin_src sh
-./zbuild.py --BUILD_TYPE=Debug
-./zbuild.py --BUILD_TYPE=Debug --install
+./zbuild.py build --profile debug
+./zbuild.py install --profile debug
 #+end_src
 
 在 ~CMAKE_PREFIX_PATH~ 已包含安装后的 ~zpp~ 和 ~zeta_deps~ 时，也可以直接
@@ -111,3 +111,7 @@ v1.2.0 继续使用 storage v1 加密单文件 backend。只有全部 ID 都符�
 内部 storage 边界。只有当
 SQLite 被 ~zeta_forge~ 统一纳管后，才增加 SQLite backend；本仓库不建立
 独立的第三方依赖管理路径。
+
+* Current build contract
+
+See [[file:../../BUILD.org][Unified build entry, defaults and verification scope]].

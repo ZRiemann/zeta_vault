@@ -1,5 +1,11 @@
 #+TITLE: zeta_vault 发布历史
 
+* v1.3.0
+
+- 迁移到统一 Forge 构建入口，支持显式交付目标、构建配置、测试和运行目标。
+- 分离 C ABI、C++ wrapper、server 与 CLI 安装组件，并要求 zpp 1.0 或更新版本。
+- 在中英文文档中说明默认构建范围和安装行为。
+
 * v1.2.0
 
 - 新增 ~zeta_vault_ctl show-utf8~，用于显式地把已存单行 UTF-8 secret 仅显示到

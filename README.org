@@ -102,15 +102,15 @@ its own process memory.
 
 Dependencies are supplied by ZetaX repositories:
 
-- ~zpp >= 0.12~;
+- ~zpp >= 1.0~;
 - libsodium from ~zeta_forge deps~;
 - GTest when tests are enabled.
 
 The preferred entry point mirrors other ZetaX C++ projects:
 
 #+begin_src sh
-./zbuild.py --BUILD_TYPE=Debug
-./zbuild.py --BUILD_TYPE=Debug --install
+./zbuild.py build --profile debug
+./zbuild.py install --profile debug
 #+end_src
 
 Direct CMake configuration is also supported when the installed ~zpp~ and
@@ -147,3 +147,7 @@ The internal storage boundary is
 replaceable. An SQLite backend should be added only after SQLite is managed
 centrally by ~zeta_forge~; this repository must not establish an independent
 third-party dependency path.
+
+* Current build contract
+
+See [[file:BUILD.org][Unified build entry, defaults and verification scope]].
