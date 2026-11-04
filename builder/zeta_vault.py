@@ -10,6 +10,7 @@ from zeta_forge.cmake_builder import (
     cmake_bool,
 )
 from zeta_forge.cmake_engine import CMAKE_ACTIONS, CMakeEngine
+from zeta_forge.cmake_run import CMakeRunTarget
 from zeta_forge.config import load_repo_config
 
 
@@ -180,6 +181,7 @@ def project(script_path: Path) -> Project:
         native_targets=native,
         components=components,
         test_targets=lambda _: ("zeta_vault_unit_tests", "zeta_vault_integration_tests"),
+        run_targets={name: CMakeRunTarget(name) for name in names if name not in defaults[:2]},
     )
     products = tuple(
         Product(

@@ -22,3 +22,13 @@ and data ownership are unchanged; never pass passwords in command arguments.
 ./zbuild.py install zeta_vault_c
 ./zbuild.py run zeta_vault_ctl -- --help
 #+end_src
+
+* Explicit run registration
+The server, ctl and C example are explicitly registered; C/C++ libraries are
+not runnable. Native =add_run_target()= supplies executable/default arguments/cwd
+through generated =.zeta-run= metadata, with no source-scanning fallback.
+After updating Forge, refresh an existing configured tree without compiling:
+=cmake -S . -B build/Release= (or =build/Debug=). Cached options are preserved;
+an example disabled in that tree requires selecting it with =build= or =dev=.
+This changes launcher metadata only, not password input, sockets, credentials,
+Vault data, installations or running services. =run= never builds implicitly.

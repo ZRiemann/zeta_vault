@@ -1,5 +1,14 @@
 #+TITLE: zeta_vault 发布历史
 
+** v1.3.2 - 2026-11-04T03:22:16Z
+:PROPERTIES:
+:CUSTOM_ID: v1.3.2
+:END:
+
+- 将 server、CLI 和 C 示例注册为显式 Forge 运行目标。
+- 记录启动器元数据的刷新方法和 =run= 的行为。
+- 本次提交未重新运行构建或测试。
+
 * v1.3.1
 
 - 从 C++ wrapper target 的 component 安装规则移除冲突的 =INCLUDES DESTINATION=，

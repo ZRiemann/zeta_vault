@@ -1,5 +1,14 @@
 #+TITLE: zeta_vault Release History
 
+** v1.3.2 - 2026-11-04T03:22:16Z
+:PROPERTIES:
+:CUSTOM_ID: v1.3.2
+:END:
+
+- Register the server, CLI, and C example as explicit Forge run targets.
+- Document launcher metadata refresh and the behavior of =run=.
+- Builds and tests were not rerun for this commit.
+
 * v1.3.1
 
 - Correct the exported C++ wrapper target's install interface by removing the
